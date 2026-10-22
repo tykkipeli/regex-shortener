@@ -1,0 +1,422 @@
+[
+  {
+    "input": "5|[1-9][0-9]*[05]",
+    "options": {
+      "seconds": 1,
+      "jobs": 1,
+      "synth": 0,
+      "seed": 1
+    },
+    "v1": {
+      "input": "5|[1-9][0-9]*[05]",
+      "regex": "5|[1-9][0-9]*[05]",
+      "before": 17,
+      "after": 17,
+      "equivalent": true,
+      "proof": "identity",
+      "input_dfa_compiled": true,
+      "seconds": 1.000138,
+      "eliminations": 10480,
+      "synthesized_languages": 0,
+      "rejected_candidates": 0
+    },
+    "v2": {
+      "input": "5|[1-9][0-9]*[05]",
+      "regex": "([1-9]0*)+[05]|5",
+      "before": 17,
+      "after": 16,
+      "equivalent": true,
+      "proof": "dfa_product",
+      "input_dfa_compiled": true,
+      "seconds": 1.000212,
+      "eliminations": 6160,
+      "synthesized_languages": 0,
+      "rejected_candidates": 0
+    }
+  },
+  {
+    "input": "7|[1-9][0-9]*[07]",
+    "options": {
+      "seconds": 1,
+      "jobs": 1,
+      "synth": 0,
+      "seed": 1
+    },
+    "v1": {
+      "input": "7|[1-9][0-9]*[07]",
+      "regex": "7|[1-9][0-9]*[07]",
+      "before": 17,
+      "after": 17,
+      "equivalent": true,
+      "proof": "identity",
+      "input_dfa_compiled": true,
+      "seconds": 1.000138,
+      "eliminations": 12992,
+      "synthesized_languages": 0,
+      "rejected_candidates": 0
+    },
+    "v2": {
+      "input": "7|[1-9][0-9]*[07]",
+      "regex": "([1-9]0*)+[07]|7",
+      "before": 17,
+      "after": 16,
+      "equivalent": true,
+      "proof": "dfa_product",
+      "input_dfa_compiled": true,
+      "seconds": 1.000244,
+      "eliminations": 6534,
+      "synthesized_languages": 0,
+      "rejected_candidates": 0
+    }
+  },
+  {
+    "input": "[1-9][0-9]*",
+    "options": {
+      "seconds": 1,
+      "jobs": 1,
+      "synth": 0,
+      "seed": 1
+    },
+    "v1": {
+      "input": "[1-9][0-9]*",
+      "regex": "[1-9][0-9]*",
+      "before": 11,
+      "after": 11,
+      "equivalent": true,
+      "proof": "identity",
+      "input_dfa_compiled": true,
+      "seconds": 1.000014,
+      "eliminations": 41802,
+      "synthesized_languages": 0,
+      "rejected_candidates": 0
+    },
+    "v2": {
+      "input": "[1-9][0-9]*",
+      "regex": "([1-9]0*)+",
+      "before": 11,
+      "after": 10,
+      "equivalent": true,
+      "proof": "dfa_product",
+      "input_dfa_compiled": true,
+      "seconds": 1.000226,
+      "eliminations": 15536,
+      "synthesized_languages": 0,
+      "rejected_candidates": 0
+    }
+  },
+  {
+    "input": "[0-9]*[1-9]",
+    "options": {
+      "seconds": 1,
+      "jobs": 1,
+      "synth": 0,
+      "seed": 1
+    },
+    "v1": {
+      "input": "[0-9]*[1-9]",
+      "regex": "[0-9]*[1-9]",
+      "before": 11,
+      "after": 11,
+      "equivalent": true,
+      "proof": "identity",
+      "input_dfa_compiled": true,
+      "seconds": 1.000016,
+      "eliminations": 36085,
+      "synthesized_languages": 0,
+      "rejected_candidates": 0
+    },
+    "v2": {
+      "input": "[0-9]*[1-9]",
+      "regex": "(0*[1-9])+",
+      "before": 11,
+      "after": 10,
+      "equivalent": true,
+      "proof": "dfa_product",
+      "input_dfa_compiled": true,
+      "seconds": 1.000215,
+      "eliminations": 14688,
+      "synthesized_languages": 0,
+      "rejected_candidates": 0
+    }
+  },
+  {
+    "input": "[2-9][1-9]*",
+    "options": {
+      "seconds": 1,
+      "jobs": 1,
+      "synth": 0,
+      "seed": 1
+    },
+    "v1": {
+      "input": "[2-9][1-9]*",
+      "regex": "[2-9][1-9]*",
+      "before": 11,
+      "after": 11,
+      "equivalent": true,
+      "proof": "identity",
+      "input_dfa_compiled": true,
+      "seconds": 1.000131,
+      "eliminations": 31600,
+      "synthesized_languages": 0,
+      "rejected_candidates": 0
+    },
+    "v2": {
+      "input": "[2-9][1-9]*",
+      "regex": "([2-9]1*)+",
+      "before": 11,
+      "after": 10,
+      "equivalent": true,
+      "proof": "dfa_product",
+      "input_dfa_compiled": true,
+      "seconds": 1.000216,
+      "eliminations": 16311,
+      "synthesized_languages": 0,
+      "rejected_candidates": 0
+    }
+  },
+  {
+    "input": "01(01|2)*",
+    "options": {
+      "seconds": 1,
+      "jobs": 1,
+      "synth": 0,
+      "seed": 1
+    },
+    "v1": {
+      "input": "01(01|2)*",
+      "regex": "01(01|2)*",
+      "before": 9,
+      "after": 9,
+      "equivalent": true,
+      "proof": "identity",
+      "input_dfa_compiled": true,
+      "seconds": 1.000144,
+      "eliminations": 11215,
+      "synthesized_languages": 0,
+      "rejected_candidates": 0
+    },
+    "v2": {
+      "input": "01(01|2)*",
+      "regex": "(012*)+",
+      "before": 9,
+      "after": 7,
+      "equivalent": true,
+      "proof": "dfa_product",
+      "input_dfa_compiled": true,
+      "seconds": 1.000234,
+      "eliminations": 11571,
+      "synthesized_languages": 0,
+      "rejected_candidates": 0
+    }
+  },
+  {
+    "input": "(01|2)*01",
+    "options": {
+      "seconds": 1,
+      "jobs": 1,
+      "synth": 0,
+      "seed": 1
+    },
+    "v1": {
+      "input": "(01|2)*01",
+      "regex": "(01|2)*01",
+      "before": 9,
+      "after": 9,
+      "equivalent": true,
+      "proof": "identity",
+      "input_dfa_compiled": true,
+      "seconds": 1.000142,
+      "eliminations": 10645,
+      "synthesized_languages": 0,
+      "rejected_candidates": 0
+    },
+    "v2": {
+      "input": "(01|2)*01",
+      "regex": "(2*01)+",
+      "before": 9,
+      "after": 7,
+      "equivalent": true,
+      "proof": "dfa_product",
+      "input_dfa_compiled": true,
+      "seconds": 1.000219,
+      "eliminations": 12032,
+      "synthesized_languages": 0,
+      "rejected_candidates": 0
+    }
+  },
+  {
+    "input": "(01|23)(01|23|4)*",
+    "options": {
+      "seconds": 1,
+      "jobs": 1,
+      "synth": 0,
+      "seed": 1
+    },
+    "v1": {
+      "input": "(01|23)(01|23|4)*",
+      "regex": "(01|23)(01|23|4)*",
+      "before": 17,
+      "after": 17,
+      "equivalent": true,
+      "proof": "identity",
+      "input_dfa_compiled": true,
+      "seconds": 1.0005,
+      "eliminations": 3760,
+      "synthesized_languages": 0,
+      "rejected_candidates": 0
+    },
+    "v2": {
+      "input": "(01|23)(01|23|4)*",
+      "regex": "((01|23)4*)+",
+      "before": 17,
+      "after": 12,
+      "equivalent": true,
+      "proof": "dfa_product",
+      "input_dfa_compiled": true,
+      "seconds": 1.000194,
+      "eliminations": 3314,
+      "synthesized_languages": 0,
+      "rejected_candidates": 0
+    }
+  },
+  {
+    "input": "[1-9]+[0-9]*",
+    "options": {
+      "seconds": 1,
+      "jobs": 1,
+      "synth": 0,
+      "seed": 1
+    },
+    "v1": {
+      "input": "[1-9]+[0-9]*",
+      "regex": "[1-9][0-9]*",
+      "before": 12,
+      "after": 11,
+      "equivalent": true,
+      "proof": "dfa_product",
+      "input_dfa_compiled": true,
+      "seconds": 1.000151,
+      "eliminations": 33315,
+      "synthesized_languages": 0,
+      "rejected_candidates": 0
+    },
+    "v2": {
+      "input": "[1-9]+[0-9]*",
+      "regex": "([1-9]0*)+",
+      "before": 12,
+      "after": 10,
+      "equivalent": true,
+      "proof": "dfa_product",
+      "input_dfa_compiled": true,
+      "seconds": 1.000225,
+      "eliminations": 16687,
+      "synthesized_languages": 0,
+      "rejected_candidates": 0
+    }
+  },
+  {
+    "input": "[1-9]{1,4}[0-9]*",
+    "options": {
+      "seconds": 1,
+      "jobs": 1,
+      "synth": 0,
+      "seed": 1
+    },
+    "v1": {
+      "input": "[1-9]{1,4}[0-9]*",
+      "regex": "[1-9][0-9]*",
+      "before": 16,
+      "after": 11,
+      "equivalent": true,
+      "proof": "dfa_product",
+      "input_dfa_compiled": true,
+      "seconds": 1.000173,
+      "eliminations": 16803,
+      "synthesized_languages": 0,
+      "rejected_candidates": 0
+    },
+    "v2": {
+      "input": "[1-9]{1,4}[0-9]*",
+      "regex": "([1-9]0*)+",
+      "before": 16,
+      "after": 10,
+      "equivalent": true,
+      "proof": "dfa_product",
+      "input_dfa_compiled": true,
+      "seconds": 1.00017,
+      "eliminations": 15694,
+      "synthesized_languages": 0,
+      "rejected_candidates": 0
+    }
+  },
+  {
+    "input": "[0-9]*[1-9]{1,4}",
+    "options": {
+      "seconds": 1,
+      "jobs": 1,
+      "synth": 0,
+      "seed": 1
+    },
+    "v1": {
+      "input": "[0-9]*[1-9]{1,4}",
+      "regex": "[0-9]*[1-9]",
+      "before": 16,
+      "after": 11,
+      "equivalent": true,
+      "proof": "dfa_product",
+      "input_dfa_compiled": true,
+      "seconds": 1.000139,
+      "eliminations": 19831,
+      "synthesized_languages": 0,
+      "rejected_candidates": 0
+    },
+    "v2": {
+      "input": "[0-9]*[1-9]{1,4}",
+      "regex": "(0*[1-9])+",
+      "before": 16,
+      "after": 10,
+      "equivalent": true,
+      "proof": "dfa_product",
+      "input_dfa_compiled": true,
+      "seconds": 1.000096,
+      "eliminations": 15316,
+      "synthesized_languages": 0,
+      "rejected_candidates": 0
+    }
+  },
+  {
+    "input": "1234567(1234567|8)*",
+    "options": {
+      "seconds": 1,
+      "jobs": 1,
+      "synth": 0,
+      "seed": 1
+    },
+    "v1": {
+      "input": "1234567(1234567|8)*",
+      "regex": "1234567(1234567|8)*",
+      "before": 19,
+      "after": 19,
+      "equivalent": true,
+      "proof": "identity",
+      "input_dfa_compiled": true,
+      "seconds": 1.000311,
+      "eliminations": 3712,
+      "synthesized_languages": 0,
+      "rejected_candidates": 0
+    },
+    "v2": {
+      "input": "1234567(1234567|8)*",
+      "regex": "(12345678*)+",
+      "before": 19,
+      "after": 12,
+      "equivalent": true,
+      "proof": "dfa_product",
+      "input_dfa_compiled": true,
+      "seconds": 1.000267,
+      "eliminations": 3818,
+      "synthesized_languages": 0,
+      "rejected_candidates": 0
+    }
+  }
+]

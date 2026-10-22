@@ -1,0 +1,7 @@
+/build/
+/regex-shortener
+__pycache__/
+
+*.db
+*.db.lock
+*.db.tmp.*
