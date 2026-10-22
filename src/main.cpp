@@ -1,4 +1,5 @@
 #include "optimize.hpp"
+#include "optimality.hpp"
 #include <atomic>
 #include <csignal>
 #include <fstream>
@@ -34,7 +35,7 @@ static std::string quote(const std::string &s) {
     return out + '"';
 }
 static void help() {
-    std::cout << R"(regex-shortener 3.0 — aequivalente SL-haaste-Ausdruecke kuerzen (C++17)
+    std::cout << R"(regex-shortener 6.0 — aequivalente SL-haaste-Ausdruecke kuerzen (C++17)
 
   ./regex-shortener 'REGEX' [Optionen]
   echo 'REGEX' | ./regex-shortener [Optionen]
@@ -46,13 +47,16 @@ Optionen:
   --seconds N       Suchbudget in Sekunden (Standard: 15; Vorbereitung enthalten)
   --jobs N          Unabhaengige Suchlaeufe parallel (Standard: 1)
   --seed N          Reproduzierbare Zufallsfolge (Standard: 1)
-  --synth N         Kandidatenbudget der Sprachsynthese (Standard: 20000; 0 = aus)
+  --synth N         Budget der Grammatik-Aufzaehlung (Standard: 20000; 0 = aus)
   --beam N          Anzahl alternativer Ausgangsformen (Standard: 12)
   --max-states N    DFA-Zustandslimit (Standard: 4096)
   --max-nfa N       NFA-Zustandslimit (Standard: 12000)
   --json            Maschinenlesbare Ausgabe mit Statistik
+  --prove-seconds N Zusaetzliches Optimalitaetsbudget (Standard: 0.25; 0 = aus)
+  --prove-length N  Untersuchte kuerzere Syntaxlaengen (Standard: 8)
+  --prove-only      Nur die Optimalitaetspruefung ausfuehren
   --quiet           Keine Zwischenberichte auf stderr
-  --db DATEI        Persistenter Sprachkatalog (Standard: neben dem Programm)
+  --db DATEI        Eigenen Sprachkatalog aktivieren (Standard: abgeschaltet)
   --no-catalog      Katalog weder lesen noch schreiben
   --learn REGEX     Ausdruck in den Katalog aufnehmen
   --version         Versionsnummer
@@ -71,9 +75,11 @@ int main(int argc, char **argv) {
     std::signal(SIGTERM, stop_search);
     try {
         Options opts;
-        bool json = false, noCatalog = false;
+        bool json = false, noCatalog = true;
+        bool explicitlyDisabledCatalog = false;
         std::string database;
-        int jobs = 1;
+        int jobs = 1, proveLength = 8;
+        double proveSeconds = 0.25;
         std::string input, file, mode = "opt";
         std::vector<std::string> args;
         auto value = [&](int &i) {
@@ -92,7 +98,7 @@ int main(int argc, char **argv) {
         for (int i = 1; i < argc; ++i) {
             std::string s = argv[i];
             if (s == "--version") {
-                std::cout << "regex-shortener 3.0\n";
+                std::cout << "regex-shortener 6.0\n";
                 return 0;
             }
             if (s == "--help" || s == "-h") {
@@ -113,6 +119,15 @@ int main(int argc, char **argv) {
                 opts.beam = int(integer(i, 1, 200));
             else if (s == "--synth")
                 opts.synthesis = int(integer(i, 0, 10000000));
+            else if (s == "--prove-length")
+                proveLength = int(integer(i, 0, 64));
+            else if (s == "--prove-seconds") {
+                std::string v = value(i);
+                size_t end = 0;
+                proveSeconds = std::stod(v, &end);
+                if (end != v.size() || !std::isfinite(proveSeconds) || proveSeconds < 0 || proveSeconds > 604800)
+                    throw std::runtime_error("--prove-seconds muss zwischen 0 und 604800 liegen");
+            }
             else if (s == "--max-states")
                 opts.limits.dfa = int(integer(i, 2, 100000));
             else if (s == "--max-nfa")
@@ -121,13 +136,20 @@ int main(int argc, char **argv) {
                 opts.quiet = true;
             else if (s == "--json")
                 json = true;
-            else if (s == "--db")
+            else if (s == "--db") {
                 database = value(i);
-            else if (s == "--no-catalog")
+                if (!explicitlyDisabledCatalog)
+                    noCatalog = false;
+            } else if (s == "--no-catalog") {
                 noCatalog = true;
-            else if (s == "--learn")
+                explicitlyDisabledCatalog = true;
+            } else if (s == "--learn") {
                 mode = "learn";
-            else if (s == "--file")
+                if (!explicitlyDisabledCatalog)
+                    noCatalog = false;
+            } else if (s == "--prove-only") {
+                mode = "prove";
+            } else if (s == "--file")
                 file = value(i);
             else if (s == "--equiv")
                 mode = "equiv";
@@ -193,7 +215,6 @@ int main(int argc, char **argv) {
             if (database.empty())
                 database = (directory / "regex-shortener.db").string();
             catalog = std::make_shared<LanguageCatalog>();
-            catalog->seed((directory / "catalog/seed.regex").string(), opts.limits);
             catalog->load(database);
             opts.catalog = catalog;
         }
@@ -218,6 +239,10 @@ int main(int argc, char **argv) {
         auto started = Budget::Clock::now();
         auto work = [&](int i) {
             try {
+                if (mode == "prove") {
+                    results[i].r=raw;
+                    return;
+                }
                 Options o = opts;
                 o.seed += uint64_t(i) * 0x9e3779b97f4a7c15ULL;
                 if (i)
@@ -264,6 +289,10 @@ int main(int argc, char **argv) {
             stats.eliminations += r.stats.eliminations;
             stats.synthesized += r.stats.synthesized;
             stats.catalogHits += r.stats.catalogHits;
+            stats.contextCandidates += r.stats.contextCandidates;
+            stats.semanticCandidates += r.stats.semanticCandidates;
+            stats.automataBranches += r.stats.automataBranches;
+            stats.closureCandidates += r.stats.closureCandidates;
         }
         std::string out = wrap(best, 1);
         // The original text is always a valid fallback, including redundant
@@ -290,6 +319,21 @@ int main(int argc, char **argv) {
                              "bleibt erhalten.\n";
             out = input;
         }
+        OptimalityResult optimal;
+        optimal.expression = out;
+        if (proveSeconds > 0 && !interrupted.load())
+            try {
+                Budget preparation(proveSeconds);
+                DFA language = compile(Parser(out,false).parse(), opts.limits, &preparation);
+                proof = true;
+                double remaining=std::chrono::duration<double>(preparation.end-Budget::Clock::now()).count();
+                optimal = OptimalityCheck(language,opts.limits).run(out,std::max(0.0,remaining),proveLength);
+                out = optimal.expression;
+            } catch (const Limit &) {
+                optimal.reason = "resource_limit";
+            }
+        else if (interrupted.load())
+            optimal.reason = "interrupted";
         if (catalog)
             try {
                 for (const auto &r : results)
@@ -310,6 +354,10 @@ int main(int argc, char **argv) {
                       << stats.eliminations << " Eliminationslaeufe, " << stats.synthesized
                       << " synthetisierte Sprachen; " << std::fixed << std::setprecision(2)
                       << elapsed << " s.\n";
+        if (!opts.quiet && proveSeconds > 0)
+            std::cerr << (optimal.proven ? "BEWIESEN KUERZEST: " : "Optimalitaet nicht bewiesen: ")
+                      << "Laengenuntergrenze " << optimal.lowerBound << ", Ergebnislaenge "
+                      << out.size() << " (" << optimal.reason << ").\n";
         if (json)
             std::cout << "{\"input\":" << quote(input) << ",\"regex\":" << quote(out)
                       << ",\"before\":" << input.size() << ",\"after\":" << out.size()
@@ -320,7 +368,19 @@ int main(int argc, char **argv) {
                       << ",\"eliminations\":" << stats.eliminations
                       << ",\"synthesized_languages\":" << stats.synthesized
                       << ",\"rejected_candidates\":" << stats.rejected
-                      << ",\"catalog_hits\":" << stats.catalogHits << "}\n";
+                      << ",\"catalog_hits\":" << stats.catalogHits
+                      << ",\"context_candidates\":" << stats.contextCandidates
+                      << ",\"semantic_candidates\":" << stats.semanticCandidates
+                      << ",\"automata_branches\":" << stats.automataBranches
+                      << ",\"closure_candidates\":" << stats.closureCandidates
+                      << ",\"optimal\":" << (optimal.proven ? "true" : "false")
+                      << ",\"optimality\":{\"proven\":" << (optimal.proven ? "true" : "false")
+                      << ",\"lower_bound\":" << optimal.lowerBound
+                      << ",\"method\":" << quote(optimal.method)
+                      << ",\"reason\":" << quote(optimal.reason)
+                      << ",\"profiles\":" << optimal.profiles
+                      << ",\"refinements\":" << optimal.refinements
+                      << ",\"seconds\":" << optimal.seconds << "}}\n";
         else
             std::cout << out << '\n';
         return 0;

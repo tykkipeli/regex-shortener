@@ -12,6 +12,7 @@ import sys
 import time
 import tempfile
 import concurrent.futures
+import shutil
 
 BIN = str(Path(sys.argv[1] if len(sys.argv) > 1 else Path(__file__).resolve().parents[1] / 'regex-shortener').resolve())
 COUNT = int(os.environ.get('RX_FUZZ_CASES', '120'))
@@ -24,11 +25,12 @@ def call(*args, codes=(0,), timeout=15):
 
 
 def optimize(expr, seconds='0.035', *extra):
-    p = call(expr, '--seconds', seconds, '--quiet', '--json', *extra)
+    p = call(expr, '--seconds', seconds, '--quiet', '--json', '--prove-seconds', '0', *extra)
     j = json.loads(p.stdout)
     assert j['equivalent'] is True, j
     assert j['after'] <= j['before'], j
     assert j['after'] == len(j['regex']), j
+    assert j['optimal'] is False, j
     return j
 
 
@@ -53,6 +55,57 @@ for expr in valid:
     assert_language(expr, j['regex'], words())
 
 # Strict rejection rather than silently interpreting a different regex dialect.
+latest = '(0|11|100|1011|10100|101011|101010[10])[10]*|[10]{0,5}'
+j = optimize(latest, '0.6', '--synth', '0')
+assert j['after'] <= 18 and j['catalog_hits'] == 0, j
+assert_language(latest, j['regex'], words('01', 12))
+
+# The engine receives only the frozen automatically generated expression.
+# The direct forbidden-substring predicate is an independent test oracle.
+suite = json.loads((Path(__file__).resolve().parents[1] / 'examples/sl-inputs.json').read_text())
+substring_input = next(x['input'] for x in suite if x['id'] == '5.8')
+j = optimize(substring_input, '3', '--synth', '0')
+assert j['after'] <= 24 and j['catalog_hits'] == 0, j
+compiled = re.compile(j['regex'])
+for w in words('01', 12):
+    assert bool(compiled.fullmatch(w)) == ('101010' not in w), (j, w)
+
+# Generate different single-word complements; reference matching is just string
+# inequality, independently of regex construction and automata implementation.
+for forbidden, alphabet in [('0101','01'), ('1111','01'), ('20120','012'),
+                            ('67676767','67'), ('0100110','01'), ('0','01')]:
+    cls = '['+alphabet+']'
+    branches = [cls+'{0,'+str(len(forbidden)-1)+'}', cls+'{'+str(len(forbidden)+1)+',}']
+    for i,c in enumerate(forbidden):
+        rest = ''.join(a for a in alphabet if a != c)
+        branches.append(forbidden[:i]+'['+rest+']'+cls+'*')
+    expr = '|'.join(branches)
+    result = optimize(expr,'0.5','--synth','0')
+    assert result['after'] < len(expr), result
+    pattern = re.compile(result['regex'])
+    for w in words(alphabet,7):
+        assert bool(pattern.fullmatch(w)) == (w != forbidden), (forbidden,result,w)
+
+official = json.loads((Path(__file__).resolve().parents[1]/'examples/regressions-v4.json').read_text())
+for case in official:
+    result = optimize(case['input'],'0.6','--synth','0')
+    assert result['after'] <= case['limit'], (case['id'],result)
+    assert result['catalog_hits'] == 0
+    def reference(w):
+        a,b = w.count('0'),w.count('1')
+        if case['id']=='1.8':return '000' in w or '111' in w
+        if case['id']=='1.9':return bool(w) and w[0]!='0' and int(w)%5==0
+        if case['id']=='2.1':return a==2 or b==2
+        if case['id']=='4.2':return a%2==0 or b%2==0
+        if case['id']=='4.3':return a%2==1 or b%2==1
+        if case['id']=='3.6':return len(w)!=5
+        return len(w) in {7*a+8*b for a in range(10) for b in range(10)}
+    alphabet,limit=('0125',5) if case['id']=='1.9' else ('01',7)
+    if case['id']=='3.7':alphabet,limit='0',70
+    p = re.compile(result['regex'])
+    for w in words(alphabet,limit):
+        assert bool(p.fullmatch(w)) == reference(w), (case['id'],w,result)
+
 invalid = ['0{2}*', '0++', '0?*', '[^0]', '[9-0]', '[]', '[0-]', '.',
            '^0$', r'\d', '(0', '0)', '0{,2}', '0{3,2}', '0{2', '[01',
            'a', '0 1', '*0', '0{99999999999999999,88888888888888888}']
@@ -139,7 +192,7 @@ j = optimize('(0*1*|0*1*0*1*)[01]{50}', '0.3')
 call('--equiv', j['input'], j['regex'], '--seconds', '5')
 
 # Stdin, files, JSON, parallel execution, numeric option validation.
-assert call('--version').stdout.strip() == 'regex-shortener 3.0'
+assert call('--version').stdout.strip() == 'regex-shortener 6.0'
 p = subprocess.run([BIN, '--no-catalog', '--seconds', '0.05', '--quiet'], input='000000000000\n', text=True, capture_output=True, check=True)
 assert len(p.stdout.strip()) <= 5
 j = optimize('(01|001|0001)*', '0.15', '--jobs', '2')
@@ -155,6 +208,19 @@ out, err = p.communicate(timeout=10)
 assert p.returncode == 0, (out, err)
 j = json.loads(out)
 assert j['equivalent'] and j['after'] <= 5, j
+# Persistent semantic catalog: whole expressions, windows in a flattened
+# Normal invocation must not consume a pre-existing answer/history database.
+with tempfile.TemporaryDirectory() as temporary:
+    isolated=Path(temporary)/'regex-shortener'
+    shutil.copy2(BIN,isolated)
+    subprocess.run([str(isolated),'--learn','0*','--seconds','1'],check=True,capture_output=True)
+    database=Path(temporary)/'regex-shortener.db'
+    before=database.read_bytes()
+    result=subprocess.run([str(isolated),'(00|0)*','--seconds','0.08','--quiet','--json'],
+                          check=True,text=True,capture_output=True)
+    assert json.loads(result.stdout)['catalog_hits']==0
+    assert database.read_bytes()==before
+
 # Persistent semantic catalog: whole expressions, windows in a flattened
 # concatenation, damaged records, and concurrent read/merge/write.
 with tempfile.TemporaryDirectory() as temporary:

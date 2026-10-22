@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Reproduce the submitted benchmark with and without the language catalog."""
+"""Six submitted inputs with no catalog and an explicitly enabled empty catalog.
+
+Reference expressions in the result are comparison data, never solver inputs.
+Version 5 no longer imports reference solutions into a new catalog.
+"""
 import argparse
 import concurrent.futures
 import json

@@ -146,8 +146,8 @@ int main() {
             target, advancedBudget, 0, [](R r) { return structural(r); },
             [](R, const std::string &) {});
         R result = search.finite(lengths);
-        assert(compare(compileRaw(alt(literal)), compileRaw(Parser(result->s, false).parse()))
-                   .equal);
+        assert(
+            compare(compileRaw(alt(literal)), compileRaw(Parser(result->s, false).parse())).equal);
         ++tests;
     }
     // Recognize the same adjacency language after changing its alphabet.
@@ -182,6 +182,44 @@ int main() {
         ++tests;
     }
     std::mt19937 rng(199937);
+    // Independent greedy subsequence automata, including repeated adjacent
+    // letters, larger alphabets and a one-letter alphabet.
+    for (int trial = 0; trial < 240; ++trial) {
+        int k = 1 + int(rng() % 4), mask = (1 << k) - 1;
+        std::string word;
+        for (int i = 0, len = 1 + int(rng() % 12); i < len; ++i)
+            word += char('0' + rng() % k);
+        int m = int(word.size()), dead = m;
+        DFA d;
+        d.t.resize(m + 1);
+        d.accept.assign(m + 1, 1);
+        d.accept[dead] = 0;
+        for (int q = 0; q <= m; ++q) {
+            d.t[q].fill(dead);
+            if (q == dead)
+                continue;
+            for (int c = 0; c < k; ++c)
+                d.t[q][c] = q + (word[q] == char('0' + c));
+        }
+        PatternSearch search(
+            d, advancedBudget, {}, [](R, const std::string &) {},
+            [](R r) { return structural(r); });
+        R r = search.avoidSubsequence(word, mask);
+        assert(compare(d, compileRaw(Parser(r->s, false).parse())).equal);
+        ++tests;
+    }
+    for (auto operand : {"0*1*", "0?1?", "(01)*", "(|00|111)", "(0?1){0,3}"})
+        for (int lo = 0; lo <= 4; ++lo)
+            for (int hi = std::max(1, lo); hi <= 6; ++hi) {
+                R base = Parser(operand, false).parse();
+                R r = rawRep(base, lo, hi);
+                std::string literal = "(" + std::string(operand) + "){" + std::to_string(lo) + "," +
+                                      std::to_string(hi) + "}";
+                assert(compare(compileRaw(Parser(literal, false).parse()),
+                               compileRaw(Parser(r->s, false).parse()))
+                           .equal);
+                ++tests;
+            }
     for (int it = 0; it < 2000; ++it) {
         int n = 1 + int(rng() % 18);
         DFA d;

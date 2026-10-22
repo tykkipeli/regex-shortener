@@ -1,0 +1,14 @@
+{
+  "input": "(0|11|100|1011|10100|101011|101010[10])[10]*|[10]{0,5}",
+  "regex": "(0*1*){3}|[01]{7,}",
+  "before": 54,
+  "after": 18,
+  "equivalent": true,
+  "proof": "dfa_product",
+  "input_dfa_compiled": true,
+  "seconds": 0.601134,
+  "eliminations": 911,
+  "synthesized_languages": 0,
+  "rejected_candidates": 0,
+  "catalog_hits": 0
+}

@@ -127,6 +127,13 @@ inline R rawRep(R r, I lo, I hi) {
     else
         suffix = "{" + std::to_string(lo) + "," + (hi == INF ? "" : std::to_string(hi)) + "}";
     std::string s = wrap(r, 4) + suffix;
+    // A nullable operand supplies its own padding: R{0,n} = R{n}.
+    // Keep the interval in the AST; only shorten the printed spelling.
+    if (hi > 1 && nullable(r)) {
+        std::string padded = wrap(r, 4) + "{" + std::to_string(hi) + "}";
+        if (padded.size() < s.size())
+            s = padded;
+    }
     if (lo == 0 && hi > 1) {
         // Padding with epsilon can save braces and an extra group around an
         // optional operand: (|X){n} denotes X{0,n}.
@@ -278,8 +285,15 @@ inline R alt(std::vector<R> v) {
         }
         r = std::make_shared<Node>(Node{ALT, 0, 0, 0, u, s, 1});
     }
-    if (hasEps && !nullable(r))
-        return rep(r, 0, 1);
+    if (hasEps && !nullable(r)) {
+        R optional = rep(r, 0, 1);
+        std::string text = "|" + wrap(r, 1);
+        if (text.size() < optional->s.size()) {
+            u.insert(u.begin(), eps());
+            return std::make_shared<Node>(Node{ALT, 0, 0, 0, u, text, 1});
+        }
+        return optional;
+    }
     return r;
 }
 struct ParseError : std::runtime_error {

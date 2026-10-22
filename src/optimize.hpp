@@ -1,7 +1,15 @@
 #pragma once
+#include "algebra_search.hpp"
 #include "automata.hpp"
+#include "automata_search.hpp"
 #include "catalog.hpp"
+#include "closure_search.hpp"
+#include "finite.hpp"
 #include "patterns.hpp"
+#include "profile_search.hpp"
+#include "synthesis.hpp"
+#include "unary_evolution.hpp"
+#include "context_loops.hpp"
 namespace rx {
 inline std::vector<R> factors(R r) {
     if (r->k == EPS)
@@ -336,12 +344,40 @@ inline std::vector<R> closureVariants(R r) {
     }
     return out;
 }
-inline R structural(R r, int depth = 0) {
+inline R factorTree(R r, int depth = 0) {
     if (depth > 100)
         return r;
+    for (int pass = 0; r->k == ALT && pass < 12; ++pass) {
+        R a = factorOnce(r, false), b = factorOnce(r, true);
+        R next = better(a, b) ? a : b;
+        if (next->s.size() < r->s.size())
+            r = next;
+        else
+            break;
+    }
+    std::vector<R> parts;
+    for (R child : r->sub)
+        parts.push_back(factorTree(child, depth + 1));
+    return rebuild(r, parts);
+}
+inline R structural(R r, int depth = 0, bool portfolio = true) {
+    if (depth > 100)
+        return r;
+    if (portfolio) {
+        // Retain both normalization orders. Local improvements must not
+        // irreversibly discard visible global sharing (or vice versa).
+        R factored = factorTree(r, depth);
+        R plain = structural(r, depth, false);
+        if (!eq(factored, r)) {
+            R other = structural(factored, depth, false);
+            if (better(other, plain))
+                return other;
+        }
+        return plain;
+    }
     std::vector<R> v;
     for (auto x : r->sub)
-        v.push_back(structural(x, depth + 1));
+        v.push_back(structural(x, depth + 1, false));
     r = rebuild(r, v);
     if (r->k == ALT) {
         // Equal bases with adjacent exponent intervals: X|XX|XXX -> X{1,3}.
@@ -385,7 +421,7 @@ inline R structural(R r, int depth = 0) {
             }
             if (!better(next, r))
                 break;
-            r = structural(next, depth + 1);
+            r = structural(next, depth + 1, false);
         }
     }
     if (r->k == REP && r->lo == 0 && r->hi == INF) {
@@ -568,12 +604,16 @@ struct Options {
 };
 struct Stats {
     size_t verified = 0, rejected = 0, eliminations = 0, synthesized = 0, catalogHits = 0;
+    size_t contextCandidates = 0, semanticCandidates = 0, automataBranches = 0,
+           closureCandidates = 0;
 };
 struct Optimizer {
     Options opt;
     Budget budget;
     std::mt19937_64 rng;
+    std::mt19937_64 archiveRng;
     R best;
+    R originalInput, previousIncumbent;
     DFA target;
     std::string targetKey;
     std::vector<int> hints;
@@ -583,7 +623,10 @@ struct Optimizer {
     std::unordered_map<std::string, std::shared_ptr<DFA>> cache;
     std::unordered_set<std::string> failed;
     std::unordered_map<std::string, R> semanticBank;
-    explicit Optimizer(Options o) : opt(o), budget(o.seconds), rng(o.seed) {}
+    std::vector<R> equivalentArchive;
+    std::unordered_set<std::string> archivedTexts;
+    explicit Optimizer(Options o)
+        : opt(o), budget(o.seconds), rng(o.seed), archiveRng(o.seed ^ 0x7465726d62616e6bULL) {}
     std::shared_ptr<DFA> automaton(R r) {
         auto i = cache.find(r->s);
         if (i != cache.end())
@@ -608,12 +651,30 @@ struct Optimizer {
         if (!opt.quiet)
             std::cerr << "[" << source << "] " << best->s.size() << " Zeichen: " << best->s << "\n";
     }
+    void rememberEquivalent(R r) {
+        if (r->s.size() > best->s.size() + std::max(size_t(12), best->s.size() / 3) ||
+            !archivedTexts.insert(r->s).second)
+            return;
+        equivalentArchive.push_back(r);
+        if (equivalentArchive.size() > 64) {
+            std::stable_sort(equivalentArchive.begin(), equivalentArchive.end(), better);
+            // Keep short seeds plus an unbiased sample of longer equivalent
+            // shapes. A single lexicographic normal form can hide a basin.
+            std::shuffle(equivalentArchive.begin() + 24, equivalentArchive.end(), archiveRng);
+            equivalentArchive.resize(48);
+            archivedTexts.clear();
+            for (R kept : equivalentArchive)
+                archivedTexts.insert(kept->s);
+        }
+    }
     bool consider(R r, const std::string &source) {
         budget.check();
+        R proposed = r;
         R normalized = structural(r);
         if (better(normalized, r))
             r = normalized;
-        if (!better(r, best))
+        bool improving = better(r, best);
+        if (!improving && r->s.size() > best->s.size() + std::max(size_t(12), best->s.size() / 3))
             return false;
         auto d = automaton(r);
         if (!d)
@@ -622,7 +683,18 @@ struct Optimizer {
             ++stats.rejected;
             return false;
         }
+        rememberEquivalent(r);
+        if (proposed != r && !archivedTexts.count(proposed->s) &&
+            proposed->s.size() <= best->s.size() + std::max(size_t(12), best->s.size() / 3)) {
+            auto originalDfa = automaton(proposed);
+            if (originalDfa && key(*originalDfa) == targetKey)
+                rememberEquivalent(proposed);
+        }
+        if (!improving)
+            return false;
         ++stats.verified;
+        if (r->s.size() < best->s.size())
+            previousIncumbent = best;
         best = r;
         report(source);
         return true;
@@ -1121,11 +1193,146 @@ struct Optimizer {
         }
         return changed ? rebuild(r, v) : r;
     }
+    void advancedRound(size_t round) {
+        auto remaining = [&]() {
+            return std::chrono::duration<double>(budget.end - Budget::Clock::now()).count();
+        };
+        auto offer = [&](R r, const std::string &why) { consider(r, why); };
+        auto refine = [&](R r) { return structural(r); };
+        auto closures = [&]() {
+            if (round != 0)
+                return;
+            std::vector<R> stars;
+            for (R source : {originalInput, best})
+                for (R node : subexpressions(source))
+                    if (node->k == REP && node->lo == 0 && node->hi == INF && node->s.size() >= 12)
+                        stars.push_back(node);
+            std::sort(stars.begin(), stars.end(),
+                      [](R a, R b) { return a->s.size() > b->s.size(); });
+            std::unordered_set<std::string> targets;
+            int attempts = 0;
+            for (R star : stars) {
+                budget.check();
+                auto language = automaton(star);
+                if (!language || language->t.size() > 24)
+                    continue;
+                std::string k = key(*language);
+                if (!targets.insert(k).second)
+                    continue;
+                int dead = -1;
+                for (size_t p = 0; p < language->t.size(); ++p)
+                    if (!language->accept[p] &&
+                        std::all_of(language->t[p].begin(), language->t[p].end(),
+                                    [&](int q) { return q == int(p); }))
+                        dead = int(p);
+                bool permutation = true;
+                for (int c = 0; c < 10; ++c)
+                    if (alphabet(star) & (1 << c)) {
+                        std::set<int> images;
+                        for (size_t p = 0; p < language->t.size(); ++p)
+                            if (int(p) != dead && (language->t[p][c] == dead ||
+                                                   !images.insert(language->t[p][c]).second))
+                                permutation = false;
+                    }
+                // Invertible actions provide especially useful finite phase
+                // cycles. Other closures retain a smaller exploratory slice.
+                Budget phase(std::min(permutation ? 12.0 : 0.7, remaining() * 0.23));
+                phase.end = std::min(phase.end, budget.end);
+                ClosureSearch search(*language, phase, opt.limits, refine,
+                                     [&](R r, const std::string &why) {
+                                         std::unordered_map<std::string, R> substitution{{k, r}};
+                                         consider(replace(best, substitution), why);
+                                     });
+                try {
+                    search.run(star);
+                } catch (const Limit &) {
+                    budget.check();
+                }
+                stats.closureCandidates += search.tested;
+                if (++attempts >= 2)
+                    break;
+            }
+        };
+        auto contextual = [&]() {
+            double seconds = std::min(4.0, remaining() * 0.18);
+            if (seconds < 0.02)
+                return;
+            AlgebraSearch search(target, budget, opt.limits, offer, refine,
+                                 opt.seed + 7919 * round);
+            search.run(best, seconds, 16000);
+            stats.contextCandidates += search.evaluated;
+        };
+        auto semantic = [&]() {
+            double seconds = std::min(12.0, remaining() * 0.28);
+            if (seconds < 0.02)
+                return;
+            SemanticSynthesis search(target, budget, opt.limits, refine, offer, opt.seed + round);
+            if (round % 4 == 1 || round % 4 == 2)
+                search.extraSeeds = equivalentArchive;
+            R seed = best;
+            if (round % 4 == 3 && previousIncumbent &&
+                previousIncumbent->s.size() <= best->s.size() + 8)
+                seed = previousIncumbent;
+            search.run(seed, seconds, 250000, round % 2 != 0);
+            stats.semanticCandidates += search.stats.evaluated;
+            for (R alternative : search.equivalentSeeds(24))
+                rememberEquivalent(alternative);
+            for (const auto &[k, expression] : search.learnedEntries(512)) {
+                auto previous = semanticBank.find(k);
+                if (previous == semanticBank.end()) {
+                    if (semanticBank.size() < 50000)
+                        semanticBank.emplace(k, expression);
+                } else if (better(expression, previous->second))
+                    previous->second = expression;
+            }
+        };
+        auto automata = [&]() {
+            double seconds = std::min(4.0, remaining() * 0.2);
+            if (seconds < 0.02)
+                return;
+            Budget phase(seconds);
+            phase.end = std::min(phase.end, budget.end);
+            AutomataSearch search(
+                target, phase, opt.limits,
+                [&](R r) {
+                    R simplified = structural(r);
+                    return simplified->s.size() <= 64 ? intern(simplified) : simplified;
+                },
+                offer);
+            try {
+                search.run(best);
+            } catch (const Limit &) {
+                budget.check();
+            }
+            stats.automataBranches += search.expanded;
+        };
+        // Independent workers explore different orders, without inspecting a
+        // task identity, a target length, or a stored record expression.
+        if ((opt.seed + round) % 2) {
+            contextual();
+            semantic();
+            closures();
+            automata();
+        } else {
+            automata();
+            contextual();
+            semantic();
+            closures();
+        }
+        if (round == 0 && best->s.size() > 12) {
+            Budget phase(std::min(2.0, remaining() * 0.08));
+            phase.end = std::min(phase.end, budget.end);
+            FiniteLocalSearch finite(phase, opt.limits, refine, 8);
+            consider(finite.run(best), "Endliche Teilsprachen im Kontext");
+        }
+    }
     R run(R raw) {
         best = raw;
+        originalInput = raw;
         try {
             target = compile(raw, opt.limits, &budget);
             targetKey = key(target);
+            rememberEquivalent(raw);
             hints = classHints(raw);
             verified = true;
             if (opt.catalog)
@@ -1140,6 +1347,52 @@ struct Optimizer {
                 target, budget, opt.limits, [&](R r, const std::string &why) { consider(r, why); },
                 [&](R r) { return structural(r); });
             patterns.run(best);
+            {
+                double remaining =
+                    std::chrono::duration<double>(budget.end - Budget::Clock::now()).count();
+                ContextLoopSearch loops(target,budget,opt.limits,
+                    [&](R r){return structural(r);},
+                    [&](R r,const std::string& why){consider(r,why);});
+                loops.run(best,std::min(3.0,remaining*0.12));
+            }
+            {
+                double remaining =
+                    std::chrono::duration<double>(budget.end - Budget::Clock::now()).count();
+                UnaryEvolution evolution(
+                    target, budget, opt.limits, [&](R r) { return structural(r); },
+                    [&](R r, const std::string &why) { consider(r, why); }, opt.seed);
+                evolution.run(best, std::min(15.0, remaining * 0.2));
+            }
+            {
+                double remaining =
+                    std::chrono::duration<double>(budget.end - Budget::Clock::now()).count();
+                Budget phase(std::min(2.0, remaining * 0.2));
+                phase.end = std::min(phase.end, budget.end);
+                try {
+                    FiniteSearch finite(
+                        target, phase, opt.limits,
+                        [&](R r, const std::string &why) { consider(r, why); },
+                        [&](R r) { return structural(r); });
+                    finite.run();
+                } catch (const Limit &) {
+                    budget.check();
+                }
+            }
+            {
+                double remaining =
+                    std::chrono::duration<double>(budget.end - Budget::Clock::now()).count();
+                Budget phase(std::min(5.0, remaining * 0.24));
+                phase.end = std::min(phase.end, budget.end);
+                try {
+                    ProfileSearch profiles(
+                        target, phase, opt.limits,
+                        [&](R r, const std::string &why) { consider(r, why); },
+                        [&](R r) { return structural(r); });
+                    profiles.run(best);
+                } catch (const Limit &) {
+                    budget.check();
+                }
+            }
             int fuel = 250;
             consider(semantic(best, fuel), "Semantische Kuerzung");
             if (best->s.size() <= 1)
@@ -1197,6 +1450,7 @@ struct Optimizer {
             }
             std::vector<R> beam{best};
             std::set<std::string> beamSeen{best->s};
+            size_t advancedRounds = 0;
             for (int iteration = 0; !budget.done() && !graphs.empty(); ++iteration) {
                 int index = iteration % int(graphs.size()), mode = iteration / int(graphs.size());
                 try {
@@ -1223,6 +1477,8 @@ struct Optimizer {
                     }
                     if (iteration % 32 == 31)
                         explore(beam, beamSeen);
+                    if (iteration == 31 || iteration % 256 == 255)
+                        advancedRound(advancedRounds++);
                     if (iteration % 16 == 15) {
                         for (auto x : beam) {
                             int f = 70;
