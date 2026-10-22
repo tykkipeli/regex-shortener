@@ -1,3 +1,14 @@
+# Version 7.0
+
+- Allgemeine Grammatik für endliche unäre Sprachen mit booleschen Längenpolynomen, Kontextverträglichkeit, synthetisierten Produktfaktoren, komplementären Teilmengen und überlappenden Überdeckungen. Keine Aufgabenerkennung, Primzahlliste oder Referenzlösung im Suchcode.
+- Aufgabe 2.9 erreicht aus der eingefrorenen langen Eingabe 71 Zeichen; der vollständige kalte Vergleich erreicht nun alle 45 veröffentlichten Rekordlängen. 14 Eingaben waren bereits rekordkurz. Sämtliche Ausgaben bestehen den unabhängigen vollständigen Sprachvergleich.
+- Parallele Suchläufe teilen geprüfte Verbesserungen. Die anfängliche deterministische Längengrammatik wird nur einmal aufgebaut, und der Fortschritt berücksichtigt alle Jobs.
+- Endliche unäre Sprachen nutzen zusätzliche Laufzeit für höhere Grammatikgrenzen und weitere Polynommutationen mit neuen Starts. Speichergrenzen bleiben ausdrücklich bestehen.
+- `--checkpoint DATEI` speichert laufend den besten frisch geprüften Ausdruck atomar und ermöglicht die Wiederverwendung als Eingabe.
+- Neue unabhängige Mengen-, Wort-, Holdout- und Sanitizertests; zusätzliche Prüfungen für parallele Checkpoints, Unterbrechung und erneutes Einlesen.
+- Unveränderter strenger Optimalitätsstatus: Das Erreichen einer Rekordlänge ist kein Minimalitätsbeweis.
+- Die neue `sl-haaste-regex-shortener-update-v7.zip` hat eine flache Struktur für `unzip -o … -d .` im Projektverzeichnis. `build.sh` meldet den Beginn der Kompilierung.
+
 # Version 6.0
 
 - Kontextuelle Schleifensynthese aus kurzen allgemeinen Bausteinen, DFA-Übergangsrelationen und unabhängig erzeugten Präfix-/Suffixkontexten. Aufgabe 5.8 erreicht damit aus der kalten Eingabe 24 Zeichen ohne Katalog oder Referenzlösung.

@@ -1,0 +1,143 @@
+{
+  "description": "Cold input; no catalog; checkpoint enabled; hit time measured until progress report of length 71 followed by external SIGINT; completed output/checkpoint independently checked after exit",
+  "runs": [
+    {
+      "jobs": 1,
+      "seed": 1,
+      "hit_seconds": 4.3553801759990165,
+      "total_seconds": 4.5703525399949285,
+      "result": {
+        "input": "00(|0(|00(|00(|0{4}(|00(|0{4}(|00(|0{4}(|0{6}(|00(|0{6}(|0{4}(|00(|0{4}(|0{6}(|0{6}(|00(|0{6}(|0{4}(|00(|0{6}(|0{4}(|0{6}(|0{8}))))))))))))))))))))))))",
+        "regex": "(0(00|0{8}){2}|0{41})(|00|0{12}(|0{14})(|0{30}))|000?|0{71}|0{79}|0{89}",
+        "before": 151,
+        "after": 71,
+        "equivalent": true,
+        "proof": "dfa_product",
+        "input_dfa_compiled": true,
+        "seconds": 4.560063,
+        "eliminations": 0,
+        "synthesized_languages": 0,
+        "rejected_candidates": 0,
+        "catalog_hits": 0,
+        "context_candidates": 0,
+        "semantic_candidates": 0,
+        "automata_branches": 0,
+        "closure_candidates": 0,
+        "optimal": false,
+        "optimality": {
+          "proven": false,
+          "lower_bound": 0,
+          "method": "none",
+          "reason": "interrupted",
+          "profiles": 0,
+          "refinements": 0,
+          "seconds": 0.0
+        }
+      }
+    },
+    {
+      "jobs": 4,
+      "seed": 1,
+      "hit_seconds": 4.530421158000536,
+      "total_seconds": 4.774654287000885,
+      "result": {
+        "input": "00(|0(|00(|00(|0{4}(|00(|0{4}(|00(|0{4}(|0{6}(|00(|0{6}(|0{4}(|00(|0{4}(|0{6}(|0{6}(|00(|0{6}(|0{4}(|00(|0{6}(|0{4}(|0{6}(|0{8}))))))))))))))))))))))))",
+        "regex": "(0(00|0{8}){2}|0{41})(|00|0{12}(|0{14})(|0{30}))|000?|0{71}|0{79}|0{89}",
+        "before": 151,
+        "after": 71,
+        "equivalent": true,
+        "proof": "dfa_product",
+        "input_dfa_compiled": true,
+        "seconds": 4.763497,
+        "eliminations": 0,
+        "synthesized_languages": 0,
+        "rejected_candidates": 0,
+        "catalog_hits": 0,
+        "context_candidates": 0,
+        "semantic_candidates": 0,
+        "automata_branches": 0,
+        "closure_candidates": 0,
+        "optimal": false,
+        "optimality": {
+          "proven": false,
+          "lower_bound": 0,
+          "method": "none",
+          "reason": "interrupted",
+          "profiles": 0,
+          "refinements": 0,
+          "seconds": 0.0
+        }
+      }
+    },
+    {
+      "jobs": 1,
+      "seed": 2,
+      "hit_seconds": 4.345626002002973,
+      "total_seconds": 4.567316742999537,
+      "result": {
+        "input": "00(|0(|00(|00(|0{4}(|00(|0{4}(|00(|0{4}(|0{6}(|00(|0{6}(|0{4}(|00(|0{4}(|0{6}(|0{6}(|00(|0{6}(|0{4}(|00(|0{6}(|0{4}(|0{6}(|0{8}))))))))))))))))))))))))",
+        "regex": "(0(00|0{8}){2}|0{41})(|00|0{12}(|0{14})(|0{30}))|000?|0{71}|0{79}|0{89}",
+        "before": 151,
+        "after": 71,
+        "equivalent": true,
+        "proof": "dfa_product",
+        "input_dfa_compiled": true,
+        "seconds": 4.555661,
+        "eliminations": 0,
+        "synthesized_languages": 0,
+        "rejected_candidates": 0,
+        "catalog_hits": 0,
+        "context_candidates": 0,
+        "semantic_candidates": 0,
+        "automata_branches": 0,
+        "closure_candidates": 0,
+        "optimal": false,
+        "optimality": {
+          "proven": false,
+          "lower_bound": 0,
+          "method": "none",
+          "reason": "interrupted",
+          "profiles": 0,
+          "refinements": 0,
+          "seconds": 0.0
+        }
+      }
+    }
+  ],
+  "full_budget_run": {
+    "jobs": 4,
+    "seed": 1,
+    "requested_seconds": 75,
+    "external_interruption": false,
+    "checkpoint_matches_final": true,
+    "equivalent_to_frozen_input": true,
+    "result": {
+      "input": "00(|0(|00(|00(|0{4}(|00(|0{4}(|00(|0{4}(|0{6}(|00(|0{6}(|0{4}(|00(|0{4}(|0{6}(|0{6}(|00(|0{6}(|0{4}(|00(|0{6}(|0{4}(|0{6}(|0{8}))))))))))))))))))))))))",
+      "regex": "((00|0{8}){2}0|0{41})((0{12}|0{26})(0{30})?|00)?|000?|0{71}|0{79}|0{89}",
+      "before": 151,
+      "after": 71,
+      "equivalent": true,
+      "proof": "dfa_product",
+      "input_dfa_compiled": true,
+      "seconds": 75.002739,
+      "eliminations": 0,
+      "synthesized_languages": 0,
+      "rejected_candidates": 0,
+      "catalog_hits": 0,
+      "context_candidates": 55078,
+      "semantic_candidates": 0,
+      "automata_branches": 0,
+      "closure_candidates": 0,
+      "optimal": false,
+      "optimality": {
+        "proven": false,
+        "lower_bound": 8,
+        "method": "finite_observation_complete_grammar",
+        "reason": "length_limit",
+        "profiles": 169,
+        "refinements": 0,
+        "seconds": 0.000333
+      }
+    }
+  }
+}

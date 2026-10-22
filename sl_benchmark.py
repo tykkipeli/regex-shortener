@@ -187,7 +187,7 @@ def main():
     parser.add_argument('--workers',type=int,default=2)
     parser.add_argument('--binary',default=str(ROOT/'regex-shortener'))
     parser.add_argument('--baseline-binary',help='Optional previous version for paired comparison')
-    parser.add_argument('--output',default=str(ROOT/'examples/benchmarks-sl-v6.json'))
+    parser.add_argument('--output',default=str(ROOT/'examples/benchmarks-sl-v7.json'))
     parser.add_argument('--input-suite',default=str(ROOT/'examples/sl-inputs.json'),help='Frozen automatically generated inputs for reproducible comparisons')
     parser.add_argument('--only',nargs='*',help='Task IDs to run')
     parser.add_argument('--stop-at-record',action='store_true',help='Benchmark harness interrupts after a published target is reached; never passes that length to the optimizer')

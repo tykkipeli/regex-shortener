@@ -1,34 +1,34 @@
-# Validierung von Version 6.0
+# Validierung von Version 7.0
 
-Geprüft am 22. Oktober 2026 mit GCC 13.3.0 unter Linux. Der Release-Build verwendet C++17, `-O3 -DNDEBUG -pthread -Wall -Wextra -Wpedantic` und ist ohne Compilerwarnungen erfolgreich.
+Geprüft am 22. Oktober 2026 unter Linux mit GCC 13.3.0. Der direkte Release-Build (`-std=c++17 -O3 -DNDEBUG -pthread -Wall -Wextra -Wpedantic`) war erfolgreich und ohne Compilerwarnungen. Es werden keine externen Solver oder C++-Bibliotheken verwendet.
 
-## Neu und erneut geprüft
+## Neue Längengrammatik
 
-- **6.520 mathematische Kernprüfungen** bestanden, einschließlich einer unabhängigen Minimalitätsprüfung für 2.000 zufällige DFA.
-- **1.000 Ende-zu-Ende-Zufallstests** bestanden, mit unabhängigen Vergleichen gegen Python `re.fullmatch`, öffentlicher Wortprüfung sowie Syntax-, Ressourcen-, Katalog-, Parallel- und Unterbrechungstests.
-- Das neue 24-Zeichen-Ergebnis für 5.8 wurde zusätzlich an allen **8.191 binären Wörtern bis Länge 12** direkt mit der Bedingung „101010 kommt nicht als Teilwort vor“ verglichen. Dies ist ein separater Test; der Sucher bekommt dieses Wort nicht als Zusatzinformation.
-- **8.135 unabhängige Prüfungen** für die Beobachtungsalgebra und den Optimalitätsprüfer bestanden. Zufällige Ausdrücke werden mit unabhängig erzeugten endlichen Wortmengen verglichen; außerdem werden bestätigte Minima, falsche obere Schranken, deaktivierte Prüfung, Syntaxgrenzen, Speichergrenzen und Unterbrechung geprüft.
-- Ein zweiter Prüfer erzeugt **17.535 rohe Syntaxausdrücke bis Länge 6**, ohne die semantische Zusammenfassung oder gewichtete Suche des C++-Prüfers zu verwenden. Er vergleicht **255 Wörter** mit Python, prüft **16 Optimalitätsfälle** und löst jede kürzere Beobachtungskollision durch einen vollständigen Automatenvergleich. Dazu kommen drei ausdrücklich unvollständige oder abgeschaltete Prüfungen. Unbeschränkte Backtracking-Auswertung langer Testwörter ist dafür nicht erforderlich.
-- **Kontextuelle Schleifen:** 145 unabhängige Prüfungen bestanden. Enthalten sind 30 zufällige Übergangsautomaten, 24 verschiedene unabhängig konstruierte Teilwortautomaten mit anderen Ziffern und Perioden sowie unabhängige Prüfungen der Übergangsrelationen. In diesem Release-Lauf wurden vier weitere kürzere Holdout-Ergebnisse exakt bestätigt.
-- **Unäre Mengen:** 48 zufällige beziehungsweise strukturierte Mengen und Skalierungen 1 bis 3 bestanden erneut die unabhängige exakte Prüfung; einschließlich angebotener Zwischenverbesserungen wurden 162 Sprachvergleiche ausgeführt.
+- **4.443 unabhängige Prüfungen** im Release-Modultest bestanden. Faltung und kompatible Verschiebungen werden mit unabhängig berechneten Ganzzahlmengen verglichen. Stichproben der erzeugten Syntax werden frisch kompiliert und an allen Längen 0 bis 127 geprüft. 18 zufällige Holdout-Mengen verwenden sämtliche Ziffern 0 bis 9; 69 angebotene Verbesserungen wurden vollständig geprüft.
+- Die Primzahlbedingung wird ausschließlich im Test als unabhängiges Prädikat berechnet und in einen einfachen Kettenautomaten übersetzt. Eine lange Vereinigung einzelner Längen dient als Eingabe. Der Suchcode findet ohne Katalog selbst eine exakt gleichwertige Lösung mit höchstens 71 Zeichen.
+- AddressSanitizer und UndefinedBehaviorSanitizer bestanden **4.431 Prüfungen**, einschließlich desselben Primzahltests und 63 bestätigter Holdout-Verbesserungen. Unterschiede bei Zwischenverbesserungen und Stichprobenzahlen entstehen durch lokale Zeitgrenzen. Alle festen Fälle werden ausgeführt. Es gab keine Sanitizer-Meldungen; Leak-Erkennung war wegen der Laufzeitumgebung deaktiviert.
+- Die Grammatikbank ist heuristisch begrenzt. Ihre Dominanzregeln und Ressourcenabbrüche werden niemals als Beweis der kürzesten möglichen Darstellung verwendet.
 
-## Speicher und Ressourcen
+## Gesamtes Programm und unveränderte Beweislogik
 
-AddressSanitizer und UndefinedBehaviorSanitizer bestanden für die Optimalitätsprüfung (8.135 Prüfungen), Kontextschleifen (144 Prüfungen) und die geänderte unäre Mengensuche (106 Sprachprüfungen). Unterschiede in der Zahl angebotener Zwischenverbesserungen entstehen durch die lokalen Zeitlimits; sämtliche festen Testfälle werden weiterhin ausgeführt. Es gab keine Sanitizer-Meldungen. Die Leak-Prüfung wurde wegen der Ausführungsumgebung deaktiviert.
+- **6.520 mathematische Kernprüfungen** bestanden, einschließlich unabhängiger DFA-Minimalitätsprüfung.
+- **1.000 Ende-zu-Ende-Zufallstests** bestanden, einschließlich Wortprüfungen gegen Python `re.fullmatch`, Syntax, Limits, Katalog, Parallelbetrieb und Strg+C.
+- Neue CLI-Tests beobachten einen verbesserten Checkpoint bereits während eines noch laufenden Zwei-Job-Prozesses, unterbrechen ihn, vergleichen den gespeicherten Ausdruck mit der Abschlussausgabe und prüfen ihn exakt. Erneutes Einlesen und Speichern derselben Datei, Epsilon-Ausgabe, fehlende Elternverzeichnisse und die Beseitigung temporärer Dateien sind abgedeckt.
+- Die Optimalitätsprüfung bestand erneut **8.135 unabhängige Prüfungen**.
+- Der unabhängige rohe Syntaxprüfer bestand erneut **17.535 Ausdrücke**, **255 Wörter**, **16 Mindestlängenfälle** und drei unvollständige beziehungsweise abgeschaltete Prüfungen.
+- Die unveränderten weiteren Modulprüfungen aus V5/V6 bleiben in `test.sh` enthalten. Sie wurden in diesem Update nicht sämtlich erneut separat kompiliert. Ein vollständiger Sanitizerlauf des ganzen CLI-Programms oder ein ausgeführter CMake-Build wird nicht behauptet.
 
-Die unveränderten Verfahren und ihre bereits bestandenen Modulprüfungen aus Version 5 bleiben in `test.sh` enthalten: endliche Sprachen, allgemeine Überdeckungen, Automatenportfolio, Kontextmutationen, semantische Synthese, Makroaktionen, Fortsetzungsprofile und Polynom-Evolution. Die historischen Berichte dokumentieren ihre damaligen Messungen. Ein vollständiger erneuter Sanitizerlauf des gesamten Kommandozeilenprogramms wird nicht behauptet.
+## Vollständiger SL-haaste-Vergleich
 
-CMake wurde hier nicht ausgeführt; der direkte C++17-Build und die direkten Test-Builds wurden ausgeführt.
+Der kalte Durchlauf erreicht **45 von 45 öffentlichen Rekordlängen**, ohne Katalog. Alle 45 Ergebnisausdrücke bestehen den vollständigen Sprachvergleich zum unabhängig konstruierten Aufgabenmodell. 14 Eingaben waren schon rekordkurz.
 
-## Vollständiger Aufgabenvergleich
+Einstellungen: höchstens 180 Sekunden pro Aufgabe, `--synth 0 --no-catalog --seed 1`, ein Job pro Aufgabe, höchstens vier verschiedene Aufgaben parallel. Nur der externe Benchmark kennt die Rekordlänge und darf nach ihrem Erreichen Strg+C senden. Der Sucher erhält keinen solchen Zielwert.
 
-Der kalte Durchlauf mit höchstens 180 Sekunden pro Aufgabe erreicht **44 von 45 öffentlichen Rekordlängen**, ohne Katalog. **Alle 45 Ausgaben** bestehen den exakten Vergleich zum unabhängig modellierten Aufgabenautomaten. 14 Eingaben waren bereits rekordkurz. Nur 2.9 bleibt mit 72 statt 71 Zeichen offen.
+2.9 erreicht die 71 Zeichen im vollständigen Vergleich nach rund **5,3 Sekunden**. Drei separate kalte CLI-Messungen mit Checkpoint fanden 71 Zeichen nach **4,355 s** (ein Job, Seed 1), **4,530 s** (vier Jobs, Seed 1) und **4,346 s** (ein Job, Seed 2). Jeder Abschluss und Checkpoint wurde erneut exakt zur ursprünglichen Eingabe verglichen. Ein zusätzlicher Lauf über volle **75 Sekunden mit vier Jobs**, ohne externe Unterbrechung, behielt eine exakt bestätigte 71-Zeichen-Lösung; Checkpoint und Abschluss stimmen überein. Diese Messungen sagen nichts Verbindliches über andere Rechner aus.
 
-Die Rekordlänge gelangt nicht in den Sucher. Das externe Testprogramm darf nach einem Rekordtreffer Strg+C senden; diese externe Zeitersparnis ist in der JSON-Datei ausgewiesen. Die Modelle, ihre Grenzen, vollständigen Ergebnisse und Einstellungen stehen in `SL-VERGLEICH-v6.md` und `examples/benchmarks-sl-v6.json`.
+Messdaten und Testbedingungen stehen in `SL-VERGLEICH-v7.md`, `examples/benchmarks-sl-v7.json` und `examples/performance-v7.json`.
 
-Ein separater Durchlauf prüft die Optimalität der 45 Ergebnisausdrücke mit dem Standardbudget. Zwei Mindestlängen werden bewiesen; bei den übrigen wird ausdrücklich kein globales Optimum behauptet. Jeder dieser Ausdrücke wurde zusätzlich erneut exakt zur ursprünglichen Benchmarkeingabe verglichen. Daten: `examples/optimality-v6.json`.
-
-Eine Stichprobe, ein Katalogtreffer, ein Rekordtreffer oder ein Ressourcenlimit ersetzt niemals einen Sprach- oder Optimalitätsbeweis. Die mathematische Begründung der neuen vollständigen Untergrenzensuche steht in `OPTIMALITAET.md`.
+Ein separater Standard-Optimalitätslauf prüft alle 45 Ergebnisausdrücke und bestätigt für 1.3 und 1.6 globale Mindestlängen. Die übrigen 43 Ergebnisse, einschließlich der 71 Zeichen für 2.9, werden nicht als global optimal ausgegeben. Sämtliche 45 Nachprüfungen bestehen erneut den vollständigen Vergleich mit der eingefrorenen ursprünglichen Eingabe. Daten: `examples/optimality-v7.json`.
 
 Reproduktion:
 

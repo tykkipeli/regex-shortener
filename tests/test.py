@@ -192,7 +192,7 @@ j = optimize('(0*1*|0*1*0*1*)[01]{50}', '0.3')
 call('--equiv', j['input'], j['regex'], '--seconds', '5')
 
 # Stdin, files, JSON, parallel execution, numeric option validation.
-assert call('--version').stdout.strip() == 'regex-shortener 6.0'
+assert call('--version').stdout.strip() == 'regex-shortener 7.0'
 p = subprocess.run([BIN, '--no-catalog', '--seconds', '0.05', '--quiet'], input='000000000000\n', text=True, capture_output=True, check=True)
 assert len(p.stdout.strip()) <= 5
 j = optimize('(01|001|0001)*', '0.15', '--jobs', '2')
@@ -208,6 +208,37 @@ out, err = p.communicate(timeout=10)
 assert p.returncode == 0, (out, err)
 j = json.loads(out)
 assert j['equivalent'] and j['after'] <= 5, j
+# Cooperative jobs report/save a freshly verified spelling before completion.
+with tempfile.TemporaryDirectory() as temporary:
+    checkpoint = Path(temporary)/'best.regex'
+    p = subprocess.Popen([BIN, '(00|0)*', '--seconds', '60', '--jobs', '2',
+                          '--checkpoint', str(checkpoint), '--no-catalog', '--json',
+                          '--prove-seconds', '0'], text=True, stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE)
+    deadline = time.monotonic()+10
+    while time.monotonic() < deadline:
+        if checkpoint.exists() and checkpoint.read_text().strip() == '0*':
+            break
+        time.sleep(.03)
+    else:
+        p.kill()
+        raise AssertionError('No live checkpoint improvement')
+    p.send_signal(signal.SIGINT)
+    out, err = p.communicate(timeout=15)
+    assert p.returncode == 0, (out, err)
+    j = json.loads(out)
+    assert checkpoint.read_text() == j['regex']+'\n'
+    assert j['regex']=='0*' and '[Normalisierung]' in err, (j, err)
+    call('--equiv', '(00|0)*', checkpoint.read_text().strip())
+    assert list(Path(temporary).iterdir()) == [checkpoint]
+    resumed = call('--file', str(checkpoint), '--checkpoint', str(checkpoint),
+                   '--seconds', '.05', '--quiet', '--json')
+    assert json.loads(resumed.stdout)['after'] <= 2
+    epsilon = call('0{0}', '--prove-only', '--checkpoint', str(checkpoint), '--json')
+    assert json.loads(epsilon.stdout)['regex'] == ''
+    assert checkpoint.read_bytes() == b'\n'
+    call('0', '--checkpoint', str(Path(temporary)/'missing'/'result.regex'), codes=(2,))
+
 # Persistent semantic catalog: whole expressions, windows in a flattened
 # Normal invocation must not consume a pre-existing answer/history database.
 with tempfile.TemporaryDirectory() as temporary:

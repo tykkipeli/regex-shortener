@@ -35,7 +35,7 @@ static std::string quote(const std::string &s) {
     return out + '"';
 }
 static void help() {
-    std::cout << R"(regex-shortener 6.0 — aequivalente SL-haaste-Ausdruecke kuerzen (C++17)
+    std::cout << R"(regex-shortener 7.0 — aequivalente SL-haaste-Ausdruecke kuerzen (C++17)
 
   ./regex-shortener 'REGEX' [Optionen]
   echo 'REGEX' | ./regex-shortener [Optionen]
@@ -45,8 +45,9 @@ static void help() {
 
 Optionen:
   --seconds N       Suchbudget in Sekunden (Standard: 15; Vorbereitung enthalten)
-  --jobs N          Unabhaengige Suchlaeufe parallel (Standard: 1)
-  --seed N          Reproduzierbare Zufallsfolge (Standard: 1)
+  --jobs N          Kooperierende Suchlaeufe parallel (Standard: 1)
+  --seed N          Start der Zufallsfolge (Standard: 1)
+  --checkpoint DATEI Besten geprueften Ausdruck fortlaufend atomar speichern
   --synth N         Budget der Grammatik-Aufzaehlung (Standard: 20000; 0 = aus)
   --beam N          Anzahl alternativer Ausgangsformen (Standard: 12)
   --max-states N    DFA-Zustandslimit (Standard: 4096)
@@ -77,7 +78,7 @@ int main(int argc, char **argv) {
         Options opts;
         bool json = false, noCatalog = true;
         bool explicitlyDisabledCatalog = false;
-        std::string database;
+        std::string database, checkpoint;
         int jobs = 1, proveLength = 8;
         double proveSeconds = 0.25;
         std::string input, file, mode = "opt";
@@ -98,7 +99,7 @@ int main(int argc, char **argv) {
         for (int i = 1; i < argc; ++i) {
             std::string s = argv[i];
             if (s == "--version") {
-                std::cout << "regex-shortener 6.0\n";
+                std::cout << "regex-shortener 7.0\n";
                 return 0;
             }
             if (s == "--help" || s == "-h") {
@@ -113,6 +114,8 @@ int main(int argc, char **argv) {
                     throw std::runtime_error("--seconds muss zwischen 0 und 604800 liegen");
             } else if (s == "--seed")
                 opts.seed = uint64_t(integer(i, 0, std::numeric_limits<I>::max()));
+            else if (s == "--checkpoint")
+                checkpoint = value(i);
             else if (s == "--jobs")
                 jobs = int(integer(i, 1, 64));
             else if (s == "--beam")
@@ -234,6 +237,52 @@ int main(int argc, char **argv) {
             std::exception_ptr error;
             std::vector<std::pair<std::string, R>> learned;
         };
+        std::mutex sharedMutex;
+        R shared = raw;
+        std::shared_ptr<DFA> checkpointTarget;
+        bool checkpointFailed = false;
+        auto saveCheckpoint = [&](const std::string &text) {
+            std::string temporary = checkpoint + ".tmp." + std::to_string(::getpid());
+            {
+                std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
+                output << text << '\n';
+                output.close();
+                if (!output) {
+                    std::remove(temporary.c_str());
+                    throw std::runtime_error("Checkpoint kann nicht geschrieben werden: " + checkpoint);
+                }
+            }
+            if (std::rename(temporary.c_str(), checkpoint.c_str())) {
+                std::remove(temporary.c_str());
+                throw std::runtime_error("Checkpoint kann nicht ersetzt werden: " + checkpoint);
+            }
+        };
+        if (!checkpoint.empty())
+            saveCheckpoint(input); // Fail early for an unwritable destination.
+        auto share = [&](R candidate, const std::string &source) {
+            std::lock_guard<std::mutex> guard(sharedMutex);
+            if (!better(candidate, shared))
+                return;
+            bool shorter = candidate->s.size() < shared->s.size();
+            shared = candidate;
+            if (jobs > 1 && shorter && !opts.quiet)
+                std::cerr << "[" << source << "] " << candidate->s.size()
+                          << " Zeichen: " << candidate->s << "\n";
+            if (!checkpoint.empty() && !checkpointFailed)
+                try {
+                    Budget check(10);
+                    check.honorStop = false;
+                    if (!checkpointTarget)
+                        checkpointTarget = std::make_shared<DFA>(compileRaw(raw, opts.limits, &check));
+                    DFA printed = compileRaw(Parser(candidate->s, false).parse(), opts.limits, &check);
+                    if (compare(*checkpointTarget, printed, opts.limits, &check).equal)
+                        saveCheckpoint(candidate->s);
+                } catch (const std::exception &e) {
+                    checkpointFailed = true;
+                    if (!opts.quiet)
+                        std::cerr << "Checkpoint: " << e.what() << "; Suche laeuft weiter.\n";
+                }
+        };
         std::vector<Result> results(jobs);
         std::vector<std::thread> threads;
         auto started = Budget::Clock::now();
@@ -245,8 +294,14 @@ int main(int argc, char **argv) {
                 }
                 Options o = opts;
                 o.seed += uint64_t(i) * 0x9e3779b97f4a7c15ULL;
-                if (i)
+                o.primary = i == 0;
+                if (jobs > 1)
                     o.quiet = true;
+                o.onImprovement = share;
+                o.sharedBest = [&]() {
+                    std::lock_guard<std::mutex> guard(sharedMutex);
+                    return shared;
+                };
                 Optimizer optimizer(o);
                 results[i].r = optimizer.run(raw);
                 results[i].stats = optimizer.stats;
@@ -347,6 +402,11 @@ int main(int argc, char **argv) {
             } catch (const std::exception &e) {
                 if (!opts.quiet)
                     std::cerr << "Katalog: " << e.what() << "; Suchergebnis bleibt erhalten.\n";
+            }
+        if (!checkpoint.empty())
+            try { saveCheckpoint(out); }
+            catch (const std::exception &e) {
+                if (!opts.quiet) std::cerr << e.what() << "; Ergebnis steht auf stdout.\n";
             }
         double elapsed = std::chrono::duration<double>(Budget::Clock::now() - started).count();
         if (!opts.quiet)

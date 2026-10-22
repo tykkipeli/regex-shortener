@@ -1,15 +1,15 @@
-# Regex Shortener 6.0
+# Regex Shortener 7.0
 
 Eigenständiger C++17-Optimierer für reguläre Ausdrücke über den Ziffern 0 bis 9. Er sucht kurze äquivalente Darstellungen und prüft jede ausgegebene Kürzung exakt mit Automaten. Es werden keine externen C++-Bibliotheken benötigt.
 
-Der vollständige SL-haaste-Test erreicht **44 von 45 veröffentlichten Rekordlängen**, mit bis zu 180 Sekunden pro Aufgabe und ohne Katalog. 14 Eingaben waren bereits rekordkurz. Aufgabe 2.9 bleibt mit 72 statt 71 Zeichen offen; die Messdaten und Einschränkungen stehen in `SL-VERGLEICH-v6.md`.
+Der vollständige kalte SL-haaste-Test erreicht **45 von 45 veröffentlichten Rekordlängen**, ohne Katalog. Alle 45 Ausgaben werden exakt gegen die unabhängig modellierten Aufgabenautomaten geprüft. 14 Eingaben waren bereits rekordkurz. Aufgabe 2.9 erreicht jetzt 71 Zeichen; im vollständigen Vergleich nach rund 5,3 Sekunden. Das sind Messwerte auf diesem Rechner, keine Zeit- oder Ergebnisgarantie für jede Eingabedarstellung. Details: `SL-VERGLEICH-v7.md`.
 
 ## Start und längere Suche
 
 ```bash
 bash build.sh
 ./regex-shortener --file eingabe.txt --seconds 120
-./regex-shortener --file eingabe.txt --seconds 300 --jobs 4
+./regex-shortener --file eingabe.txt --seconds 300 --jobs 2 --checkpoint beste.regex
 ```
 
 `eingabe.txt` enthält nur den Ausdruck. Alternativ kann er als einzelnes, mit einfachen Anführungszeichen geschütztes Argument oder über stdin eingegeben werden. Fortschritt erscheint auf stderr, das Ergebnis auf stdout. Mit Strg+C wird das beste bereits bestätigte Ergebnis ausgegeben.
@@ -20,7 +20,27 @@ bash build.sh
 ./regex-shortener --match '(01)*' '0101'
 ```
 
-`--json` liefert zusätzliche Statistiken. Ein längeres Suchbudget und mehrere unabhängige Suchläufe erhöhen die Chancen; die Heuristik garantiert damit kein globales Optimum.
+`--json` liefert zusätzliche Statistiken. Die parallelen Suchläufe tauschen bestätigte Verbesserungen aus; der Fortschritt zeigt das beste Ergebnis aller Jobs. Die anfängliche deterministische Längengrammatik läuft nur im ersten Job, damit nicht alle Jobs dieselbe große Bank erneut aufbauen. Mehr Jobs teilen sich CPU, Cache und Speicher. Auf einem Laptop sind zunächst ein oder zwei Jobs sinnvoll; vier Jobs müssen nicht schneller sein. Ein Zeitbudget begrenzt verstrichene Zeit, nicht die Zahl ausgeführter Kandidaten.
+
+## Über Nacht nach neuen Rekorden suchen
+
+```bash
+./regex-shortener --file eingabe.txt --seconds 28800 --jobs 2 \
+  --checkpoint beste.regex > ergebnis.regex 2> suche.log
+```
+
+Das sucht acht Stunden. `cat beste.regex` zeigt den laufend gespeicherten besten Ausdruck; `tail -f suche.log` zeigt Verbesserungen. Das Protokoll meldet neue Ergebnisse; längere Suchphasen können ohne zusätzliche Ausgabe laufen. Mit Strg+C wird das beste bestätigte Ergebnis ordentlich ausgegeben. `--checkpoint` schreibt zunächst die gültige Eingabe und ersetzt die Datei danach atomar nur durch erneut vollständig geprüfte Verbesserungen. Auch die abschließende Ausgabe wird gespeichert. Elternverzeichnisse müssen existieren. Bei Speicherausfällen läuft die Suche weiter und meldet den Fehler auf stderr.
+
+Ein neuer Lauf kann den Ausdruck erneut verwenden:
+
+```bash
+./regex-shortener --file beste.regex --checkpoint beste.regex \
+  --seconds 28800 --jobs 2 --seed 2
+```
+
+Der Checkpoint enthält den Ausdruck, nicht den internen Suchzustand. Der neue Seed verändert die zufälligen Suchpfade; bei parallelen Läufen beeinflusst auch die zeitliche Reihenfolge den Austausch. Bei endlichen unären Sprachen werden zusätzlich die Grammatikgrenzen schrittweise erhöht und weitere Polynommutationen mit neuen Starts ausgeführt. Die vollständige Grammatikbank bleibt aus Speichergründen begrenzt.
+
+Das Programm kann als Werkzeug für Rekordsuche nützlich sein. Es kann bekannte Lösungen verbessern und jeden tatsächlichen Treffer exakt bestätigen. Eine längere Laufzeit ist aber keine erschöpfende Suche über alle Ausdrücke und garantiert keine weitere Verbesserung. Acht Stunden ohne Treffer beweisen insbesondere keine Minimalität.
 
 ## Bewiesen kürzeste Ergebnisse
 
@@ -38,6 +58,7 @@ Standard: zusätzlich höchstens 0,25 Sekunden, Syntaxgrenze 8. `--prove-seconds
 
 - **Endliche Sprachen als Relationen:** Jede Trennstelle eines Wortes liefert eine Präfix-Suffix-Relation. Rechtecküberdeckungen dieser Relation ergeben konkatenierte Teilsprachen. Überlappende gewichtete Überdeckungen können beide Seiten gleichzeitig teilen. Bis zu 128 erforderliche Wörter werden mit zwei portablen 64-Bit-Masken verarbeitet. Größere erlaubte endliche Mengen können in einem bewiesenen Alternativkontext zusätzliche Wörter liefern.
 - **Kontextuelle Schleifen:** Kurze Bausteine werden zu Schleifen mit optionalen Eingangs- und Ausgangsblöcken kombiniert. Übergangsrelationen des gegebenen DFA und unabhängig erzeugte Präfix-/Suffixkontexte filtern Kandidaten; ein frischer vollständiger Sprachvergleich entscheidet über die Ausgabe. Es werden weder ein verbotenes Wort noch ein erwarteter Lösungsausdruck vorgegeben.
+- **Grammatik endlicher Längenpolynome:** Kurze Ausdrücke werden mit ihren tatsächlichen Syntaxkosten aus Union, Addition der Längenmengen und beschränkter Wiederholung aufgebaut. Nur Mengen, die sich in irgendeinen Konkatenationskontext der Zielsprache verschieben lassen, werden behalten. Unterschiedliche Teilausdrücke dürfen im Gesamtergebnis überlappen. Größere Produkte entstehen aus synthetisierten Faktoren und ihren kompatiblen Quotienten; komplementäre Teilmengen und gewichtete Überdeckungen bilden den vollständigen Ausdruck. Es gibt weder eine Liste von Primzahlen noch eine gespeicherte 71-Zeichen-Lösung im Suchcode. Die Bank ist eine Heuristik und wird nie als Optimalitätsbeweis ausgegeben.
 - **Endliche Längenmengen:** Additive Hankel-Relationen, abgeschlossene Rechtecke, Summenmengen, Verschiebungen und überlappende Überdeckungen erzeugen arithmetische Faktorisierungen. Auch unregelmäßige kleinere Teilrechtecke können günstiger sein als ihre maximale Überdeckung. Verbesserungen tiefer Teilprobleme werden sofort wieder in den gesamten Ausdruck eingesetzt. Eine zusätzliche Mutationssuche verwendet boolesche Längenpolynome mit Überlaufkontrolle und lässt vorübergehend falsche Mengen zu; veröffentlichte Ergebnisse benötigen weiterhin den vollständigen Automatenbeweis.
 - **Fortsetzungsprofile:** Der Automat liefert Zustände, ab denen alle ausreichend langen Fortsetzungen erlaubt sind. Daraus entstehen kurze Teilsprache-Kandidaten. Der exakt berechnete endliche Rest wird separat verdichtet und mit dem Kandidaten vereinigt.
 - **Makroaktionen und Sternbasen:** Aus beliebigen Unterausdrücken und Fenstern werden Übergangsrelationen berechnet. Schleifen mit Identitätswirkung, gleiche Aktionen und aus dem Automaten hergeleitete Wiederholungszahlen liefern neue Generatorbasen. Sie werden auch für Stern-Teilsprachen eines größeren Ausdrucks gesucht.
@@ -75,7 +96,7 @@ python3 sl_benchmark.py --seconds 180 --workers 4 --stop-at-record --output verg
 
 Jedes Ergebnis wird zusätzlich exakt gegen den unabhängig konstruierten Aufgabenautomaten geprüft. Das belegt die Übereinstimmung mit dem Aufgabenmodell; es ist kein formaler Beweis der Übersetzung der finnischen Beschreibung. Bei 2.5 und 2.6 können sich Anfangs- und Endpaar entsprechend der üblichen Bedeutung bei kurzen Wörtern überlappen.
 
-Vollständige Messungen, Budgets und verbleibende Abstände stehen in `examples/benchmarks-sl-v6.json` und `SL-VERGLEICH-v6.md`. Die öffentlich veröffentlichten Rekordlängen sind Vergleichswerte und keine Minimalitätsbeweise.
+Vollständige Messungen, Budgets und verbleibende Abstände stehen in `examples/benchmarks-sl-v7.json` und `SL-VERGLEICH-v7.md`. Die öffentlich veröffentlichten Rekordlängen sind Vergleichswerte und keine Minimalitätsbeweise.
 
 ## Syntax
 
@@ -92,4 +113,4 @@ RX_FUZZ_CASES=1000 python3 tests/test.py
 
 Die Tests enthalten unabhängige Wortprüfungen mit Python, Vergleiche mit nicht minimierten Automaten und separate Prüfungen der neuen Suchverfahren. `--synth N` steuert nur die ältere aufzählende Grammatiksuche; die kontextabhängigen und semantischen Suchinseln haben eigene begrenzte Phasen innerhalb des gemeinsamen Zeitbudgets.
 
-Unter Ubuntu werden ein C++17-Compiler, pthreads und für Tests Python 3 benötigt. Ein optionales CMake-Projekt ist ebenfalls enthalten. Die Aktualisierung im bestehenden Projektverzeichnis ist in `UPDATE.md` beschrieben.
+Unter Ubuntu werden GCC oder Clang mit C++17, pthreads und für Tests Python 3 benötigt. Die neue Längengrammatik verwendet den von diesen Compilern unterstützten 128-Bit-Ganzzahltyp. Der eigentliche Sucher benötigt weder Python noch SciPy oder einen externen Solver. Ein optionales CMake-Projekt ist ebenfalls enthalten. Die Aktualisierung im bestehenden Projektverzeichnis ist in `UPDATE.md` beschrieben.

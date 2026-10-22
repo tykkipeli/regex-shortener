@@ -9,6 +9,7 @@
 #include "profile_search.hpp"
 #include "synthesis.hpp"
 #include "unary_evolution.hpp"
+#include "unary_grammar.hpp"
 #include "context_loops.hpp"
 namespace rx {
 inline std::vector<R> factors(R r) {
@@ -600,7 +601,9 @@ struct Options {
     int beam = 12, synthesis = 20000;
     Limits limits;
     std::shared_ptr<const LanguageCatalog> catalog;
-    bool quiet = false;
+    bool quiet = false, primary = true;
+    std::function<void(R, const std::string &)> onImprovement;
+    std::function<R()> sharedBest;
 };
 struct Stats {
     size_t verified = 0, rejected = 0, eliminations = 0, synthesized = 0, catalogHits = 0;
@@ -618,7 +621,7 @@ struct Optimizer {
     std::string targetKey;
     std::vector<int> hints;
     Stats stats;
-    bool verified = false;
+    bool verified = false, finiteUnary = false;
     size_t cachedStates = 0;
     std::unordered_map<std::string, std::shared_ptr<DFA>> cache;
     std::unordered_set<std::string> failed;
@@ -697,6 +700,8 @@ struct Optimizer {
             previousIncumbent = best;
         best = r;
         report(source);
+        if (opt.onImprovement)
+            opt.onImprovement(best, source);
         return true;
     }
     R intern(R r) {
@@ -1193,7 +1198,14 @@ struct Optimizer {
         }
         return changed ? rebuild(r, v) : r;
     }
+    void importShared() {
+        if (opt.sharedBest)
+            if (R shared = opt.sharedBest())
+                if (better(shared, best))
+                    consider(shared, "Paralleler Suchlauf");
+    }
     void advancedRound(size_t round) {
+        importShared();
         auto remaining = [&]() {
             return std::chrono::duration<double>(budget.end - Budget::Clock::now()).count();
         };
@@ -1343,10 +1355,22 @@ struct Optimizer {
             if (!opt.quiet)
                 std::cerr << "Minimaler DFA: " << target.t.size() << " Zustaende. Suche startet.\n";
             consider(normalize(raw), "Normalisierung");
+            {
+                UnaryGrammarSearch grammar(target, budget, opt.limits,
+                    [&](R r) { return structural(r); },
+                    [&](R r, const std::string &why) { consider(r, why); }, opt.seed);
+                finiteUnary = grammar.deriveTarget();
+                if (finiteUnary && opt.primary) {
+                    double left = std::chrono::duration<double>(budget.end - Budget::Clock::now()).count();
+                    grammar.run(best, std::min(180.0, left * .5));
+                }
+            }
+            importShared();
             PatternSearch patterns(
                 target, budget, opt.limits, [&](R r, const std::string &why) { consider(r, why); },
                 [&](R r) { return structural(r); });
             patterns.run(best);
+            importShared();
             {
                 double remaining =
                     std::chrono::duration<double>(budget.end - Budget::Clock::now()).count();
@@ -1402,6 +1426,33 @@ struct Optimizer {
                 std::chrono::duration<double>(budget.end - Budget::Clock::now()).count();
             if (opt.synthesis > 0 && remain > 0.05)
                 synthesize(remain * 0.25);
+            // Finite unary languages have exact, inexpensive polynomial
+            // semantics. Continue their arithmetic search with increasing
+            // grammar bounds and fresh mutations instead of spending an
+            // overnight run mostly eliminating the same long DFA chain.
+            if (finiteUnary) {
+                for (size_t round = 0; !budget.done(); ++round) {
+                    importShared();
+                    double left = std::chrono::duration<double>(budget.end - Budget::Clock::now()).count();
+                    if (opt.primary || round % 2) {
+                        UnaryGrammarSearch grammar(target, budget, opt.limits,
+                            [&](R r) { return structural(r); },
+                            [&](R r, const std::string &why) { consider(r, why); },
+                            opt.seed + 104729 * (round + 1));
+                        int cost = 26 + int(std::min(size_t(3), round / 2));
+                        grammar.run(best, std::min(120.0, left * .35), cost);
+                    }
+                    importShared();
+                    left = std::chrono::duration<double>(budget.end - Budget::Clock::now()).count();
+                    UnaryEvolution evolution(target, budget, opt.limits,
+                        [&](R r) { return structural(r); },
+                        [&](R r, const std::string &why) { consider(r, why); },
+                        opt.seed + 15485863 * (round + 1));
+                    evolution.run(best, std::min(25.0, left * .25));
+                    advancedRound(round);
+                }
+                return best;
+            }
             std::vector<Graph> graphs;
             std::vector<bool> reversed;
             if (target.t.size() <= 100) {

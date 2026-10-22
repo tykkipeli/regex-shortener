@@ -1,17 +1,25 @@
-# Update auf Version 6.0
+# Update auf Version 7.0
 
 Im bestehenden Projektverzeichnis ausführen:
 
 ```bash
-update_dir="$(mktemp -d)" &&
-unzip -q ~/Downloads/sl-haaste-regex-shortener-update-v6.zip -d "$update_dir" &&
-cp -a "$update_dir/regex-shortener/." . &&
-bash build.sh &&
+unzip -o ~/Downloads/sl-haaste-regex-shortener-update-v7.zip -d .
+bash build.sh
 ./regex-shortener --version
 ```
 
-Erwartete Versionsausgabe: `regex-shortener 6.0`.
+Erwartete Versionsausgabe: `regex-shortener 7.0`.
 
-Eine bestehende `regex-shortener.db` wird durch die ZIP nicht überschrieben. Weitere Erklärungen, Suchbefehle und Katalogoptionen stehen in `README.md`.
+Die V7-ZIP enthält `src`, `build.sh`, README und die übrigen Projektdateien direkt auf der obersten Ebene. Beim Entpacken werden die Dateien im aktuellen Projektverzeichnis aktualisiert. Ein temporäres Verzeichnis und Kopierbefehle sind nicht erforderlich.
 
-Ab Version 5 ist der Katalog standardmäßig abgeschaltet. Für die ausdrückliche Wiederverwendung eines eigenen bisherigen Katalogs `--db regex-shortener.db` angeben.
+Das Build-Skript meldet den Beginn der Kompilierung. Der Compiler selbst kann anschließend einige Minuten ohne weitere Ausgabe arbeiten. Erst der Build aktualisiert das ausführbare Programm.
+
+Eine bestehende `regex-shortener.db` und eigene Ergebnisdateien sind nicht Teil der ZIP. Ab Version 5 ist der Katalog standardmäßig abgeschaltet. Für die ausdrückliche Wiederverwendung eines eigenen Katalogs `--db regex-shortener.db` angeben.
+
+Für einen langen Suchlauf mit laufender Ergebnissicherung:
+
+```bash
+./regex-shortener --file eingabe.txt --seconds 28800 --jobs 2 --checkpoint beste.regex
+```
+
+Weitere Erklärungen zu Checkpoints, Suchgrenzen und Rekordsuche stehen in `README.md`.
